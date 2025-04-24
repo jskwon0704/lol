@@ -6,10 +6,11 @@ import os
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.guilds = True
 intents.members = True
+intents.presences = True  # ← 이 줄 꼭 있어야 해
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
 
 user_profiles = {}
 
