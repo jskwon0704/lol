@@ -63,7 +63,6 @@ class MenuView(discord.ui.View):
             }
         user_profiles[uid]["main"] = name
         await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.")
-
     @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
     async def 사냥(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user))
@@ -79,6 +78,30 @@ class MenuView(discord.ui.View):
         msg += f"📊 레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
         await interaction.response.send_message(msg)
 
+class HuntingView(discord.ui.View):
+    def __init__(self, user):
+        super().__init__(timeout=60)
+        self.user = user
+
+    @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary, row=0)
+    async def hunt1(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_battle(interaction, 1)
+
+    @discord.ui.button(label="사냥터 2", style=discord.ButtonStyle.primary, row=0)
+    async def hunt2(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_battle(interaction, 2)
+
+    @discord.ui.button(label="사냥터 3", style=discord.ButtonStyle.primary, row=1)
+    async def hunt3(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_battle(interaction, 3)
+
+    @discord.ui.button(label="사냥터 4", style=discord.ButtonStyle.primary, row=1)
+    async def hunt4(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_battle(interaction, 4)
+
+    @discord.ui.button(label="사냥터 5", style=discord.ButtonStyle.primary, row=2)
+    async def hunt5(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_battle(interaction, 5)
 class BattleView(discord.ui.View):
     def __init__(self, user, player_mon, wild_mon):
         super().__init__(timeout=60)
@@ -112,13 +135,10 @@ class BattleView(discord.ui.View):
             self.player["max_hp"] = calculate_stat(self.player["iv"]["HP"], self.player["level"])
             self.player["hp"] = self.player["max_hp"]
             level_up_msgs.append(f"📈 레벨업! 현재 레벨: {self.player['level']}")
-
-        summary = f"🎉 전투 종료! 승리!
-경험치 +{gained_exp}\n" + "\n".join(level_up_msgs)
+        summary = f"🎉 전투 종료! 승리!\n경험치 +{gained_exp}\n" + "\n".join(level_up_msgs)
         await asyncio.sleep(1)
         await interaction.message.edit(content=summary)
         self.stop()
-
     @discord.ui.button(label="🥊 기본기", style=discord.ButtonStyle.primary, row=0)
     async def basic_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
         damage = self.calculate_damage(10)
@@ -167,31 +187,6 @@ class BattleView(discord.ui.View):
             return
         await self.update_message(interaction, f"💥 필살기로 {self.enemy['name']}에게 {damage} 데미지!")
 
-class HuntingView(discord.ui.View):
-    def __init__(self, user):
-        super().__init__(timeout=60)
-        self.user = user
-
-    @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary, row=0)
-    async def hunt1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await start_battle(interaction, 1)
-
-    @discord.ui.button(label="사냥터 2", style=discord.ButtonStyle.primary, row=0)
-    async def hunt2(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await start_battle(interaction, 2)
-
-    @discord.ui.button(label="사냥터 3", style=discord.ButtonStyle.primary, row=1)
-    async def hunt3(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await start_battle(interaction, 3)
-
-    @discord.ui.button(label="사냥터 4", style=discord.ButtonStyle.primary, row=1)
-    async def hunt4(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await start_battle(interaction, 4)
-
-    @discord.ui.button(label="사냥터 5", style=discord.ButtonStyle.primary, row=2)
-    async def hunt5(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await start_battle(interaction, 5)
-
 async def start_battle(interaction, zone):
     uid = str(interaction.user.id)
     if uid not in user_profiles or user_profiles[uid]["main"] is None:
@@ -221,13 +216,13 @@ async def start_battle(interaction, zone):
 
 @bot.command()
 async def 메뉴(ctx):
-    await ctx.send("\U0001F525 포켓몬 RPG 메뉴", view=MenuView(user=ctx.author))
+    await ctx.send("🔥 포켓몬 RPG 메뉴", view=MenuView(user=ctx.author))
 
 @bot.event
 async def on_ready():
     print(f"{bot.user} 접속 완료!")
     channel = bot.get_channel(TARGET_CHANNEL_ID)
     if channel:
-        await channel.send("\U0001F525 포켓몬 RPG 메뉴", view=MenuView(user=None))
+        await channel.send("🔥 포켓몬 RPG 메뉴", view=MenuView(user=None))
 
 bot.run(os.getenv("DISCORD_TOKEN"))
