@@ -3,6 +3,7 @@ from discord.ext import commands
 import json
 import random
 import os
+import asyncio
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -99,18 +100,40 @@ class BattleView(discord.ui.View):
     def calculate_damage(self, base):
         return random.randint(base - 2, base + 2)
 
+    async def end_battle(self, interaction):
+        uid = str(interaction.user.id)
+        gained_exp = random.randint(30, 60)
+        self.player["exp"] += gained_exp
+        level_up_msgs = []
+        while self.player["exp"] >= self.player["next_exp"]:
+            self.player["exp"] -= self.player["next_exp"]
+            self.player["level"] += 1
+            self.player["next_exp"] = exp_to_next_level(self.player["level"])
+            self.player["max_hp"] = calculate_stat(self.player["iv"]["HP"], self.player["level"])
+            self.player["hp"] = self.player["max_hp"]
+            level_up_msgs.append(f"📈 레벨업! 현재 레벨: {self.player['level']}")
+
+        summary = f"🎉 전투 종료! 승리!
+경험치 +{gained_exp}\n" + "\n".join(level_up_msgs)
+        await asyncio.sleep(1)
+        await interaction.message.edit(content=summary)
+        self.stop()
+
     @discord.ui.button(label="🥊 기본기", style=discord.ButtonStyle.primary, row=0)
     async def basic_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
         damage = self.calculate_damage(10)
+        await interaction.message.edit(content="🥊 기본기 시전 중...")
+        await asyncio.sleep(1)
         self.enemy["hp"] -= damage
         if self.enemy["hp"] <= 0:
-            await interaction.message.edit(content=f"배틀 종료! 승리 🎉")
-            self.stop()
+            await self.end_battle(interaction)
             return
         await self.update_message(interaction, f"🥊 기본기로 {self.enemy['name']}에게 {damage} 데미지!")
 
     @discord.ui.button(label="🔥 특수기", style=discord.ButtonStyle.danger, row=0)
     async def special_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.edit(content="🔥 특수기 시전 중...")
+        await asyncio.sleep(1)
         if random.random() < 0.7:
             damage = self.calculate_damage(20)
             self.enemy["hp"] -= damage
@@ -118,13 +141,14 @@ class BattleView(discord.ui.View):
         else:
             result = "🔥 특수기가 빗나갔다!"
         if self.enemy["hp"] <= 0:
-            await interaction.message.edit(content=f"배틀 종료! 승리 🎉")
-            self.stop()
+            await self.end_battle(interaction)
             return
         await self.update_message(interaction, result)
 
     @discord.ui.button(label="🌀 유틸기", style=discord.ButtonStyle.secondary, row=1)
     async def utility(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.edit(content="🌀 유틸기 사용 중...")
+        await asyncio.sleep(1)
         self.enemy["iv"]["SPD"] = max(1, self.enemy["iv"]["SPD"] - 2)
         await self.update_message(interaction, f"🌀 {self.enemy['name']}의 스피드가 감소했다!")
 
@@ -133,12 +157,13 @@ class BattleView(discord.ui.View):
         if self.special_used:
             await interaction.response.send_message("이미 필살기를 사용했습니다!", ephemeral=True)
             return
+        await interaction.message.edit(content="💥 필살기 발동 중...")
+        await asyncio.sleep(1)
         damage = int((1 - (self.player["hp"] / self.player["max_hp"])) * 40) + 10
         self.enemy["hp"] -= damage
         self.special_used = True
         if self.enemy["hp"] <= 0:
-            await interaction.message.edit(content=f"배틀 종료! 승리 🎉")
-            self.stop()
+            await self.end_battle(interaction)
             return
         await self.update_message(interaction, f"💥 필살기로 {self.enemy['name']}에게 {damage} 데미지!")
 
