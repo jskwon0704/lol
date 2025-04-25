@@ -7,7 +7,7 @@ import os
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.presences = True  # 이 줄도 꼭 있어야 해
+intents.presences = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -37,7 +37,7 @@ class MenuView(discord.ui.View):
         uid = str(interaction.user.id)
         if uid not in user_profiles:
             user_profiles[uid] = {"owned": {}, "main": None}
-        valid = [r for r in roles if r not in ["@everyone"]]
+        valid = [r for r in roles if r != "@everyone"]
         if not valid:
             await interaction.response.send_message("보유한 포켓몬 역할이 없습니다.", ephemeral=True)
             return
@@ -74,8 +74,6 @@ class HuntingView(discord.ui.View):
     def __init__(self, user):
         super().__init__(timeout=60)
         self.user = user
-        for i in range(1, 6):
-            self.add_item(discord.ui.Button(label=f"사냥터 {i}", custom_id=f"hunt_{i}", style=discord.ButtonStyle.primary))
 
     @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary, row=0)
     async def hunt1(self, interaction: discord.Interaction, button: discord.ui.Button):
