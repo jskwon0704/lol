@@ -78,10 +78,6 @@ class MenuView(discord.ui.View):
         msg += f"📊 레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
         await interaction.response.send_message(msg)
 
-    @discord.ui.button(label="배틀 시작", style=discord.ButtonStyle.danger)
-    async def 배틀(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await start_battle(interaction)
-
 class BattleView(discord.ui.View):
     def __init__(self, user, player_mon, wild_mon):
         super().__init__(timeout=60)
@@ -153,25 +149,25 @@ class HuntingView(discord.ui.View):
 
     @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary, row=0)
     async def hunt1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await handle_hunt(interaction, 1)
+        await start_battle(interaction, 1)
 
     @discord.ui.button(label="사냥터 2", style=discord.ButtonStyle.primary, row=0)
     async def hunt2(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await handle_hunt(interaction, 2)
+        await start_battle(interaction, 2)
 
     @discord.ui.button(label="사냥터 3", style=discord.ButtonStyle.primary, row=1)
     async def hunt3(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await handle_hunt(interaction, 3)
+        await start_battle(interaction, 3)
 
     @discord.ui.button(label="사냥터 4", style=discord.ButtonStyle.primary, row=1)
     async def hunt4(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await handle_hunt(interaction, 4)
+        await start_battle(interaction, 4)
 
     @discord.ui.button(label="사냥터 5", style=discord.ButtonStyle.primary, row=2)
     async def hunt5(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await handle_hunt(interaction, 5)
+        await start_battle(interaction, 5)
 
-async def handle_hunt(interaction, zone):
+async def start_battle(interaction, zone):
     uid = str(interaction.user.id)
     if uid not in user_profiles or user_profiles[uid]["main"] is None:
         await interaction.response.send_message("대표 포켓몬이 없습니다.")
@@ -183,42 +179,7 @@ async def handle_hunt(interaction, zone):
         return
 
     wild_name = random.choice(zones[str(zone)])
-    wild_level = random.randint(zone * 5, zone * 10)
-    wild_iv = generate_iv()
-    wild_stat = {
-        "DEF": calculate_stat(wild_iv["DEF"], wild_level),
-        "SPD": calculate_stat(wild_iv["SPD"], wild_level),
-    }
-
-    mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
-    atk_stat = calculate_stat(mon["iv"]["ATK"], mon["level"])
-    spd_stat = calculate_stat(mon["iv"]["SPD"], mon["level"])
-    player_score = atk_stat + spd_stat
-    wild_score = wild_stat["DEF"] + wild_stat["SPD"]
-
-    result = "승리" if player_score >= wild_score else "실패"
-    gained_exp = random.randint(20, 50) + (zone * 10) if result == "승리" else random.randint(5, 10)
-    mon["exp"] += gained_exp
-    message = f"[사냥터 {zone}] Lv{wild_level} {wild_name} 조우 결과: {result}!\n획득 경험치: {gained_exp}\n"
-
-    while mon["exp"] >= mon["next_exp"]:
-        mon["exp"] -= mon["next_exp"]
-        mon["level"] += 1
-        mon["next_exp"] = exp_to_next_level(mon["level"])
-        mon["max_hp"] = calculate_stat(mon["iv"]["HP"], mon["level"])
-        mon["hp"] = mon["max_hp"]
-        message += f"📈 레벨업! 현재 레벨: {mon['level']}\n"
-
-    await interaction.response.send_message(message)
-
-async def start_battle(interaction):
-    uid = str(interaction.user.id)
-    if uid not in user_profiles or user_profiles[uid]["main"] is None:
-        await interaction.response.send_message("대표 포켓몬이 없습니다.")
-        return
-
     player_mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
-    wild_name = random.choice(["야돈", "깨비참", "리자드", "푸호꼬"])
     wild_level = random.randint(player_mon["level"] - 1, player_mon["level"] + 2)
     wild_iv = generate_iv()
     wild_mon = {
