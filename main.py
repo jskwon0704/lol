@@ -71,6 +71,10 @@ class MenuView(discord.ui.View):
         msg += f"📊 레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
         await interaction.response.send_message(msg)
 
+    @discord.ui.button(label="배틀 시작", style=discord.ButtonStyle.danger)
+    async def 배틀(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await start_battle(interaction)
+
 class HuntingView(discord.ui.View):
     def __init__(self, user):
         super().__init__(timeout=60)
@@ -146,5 +150,84 @@ async def on_ready():
     channel = bot.get_channel(TARGET_CHANNEL_ID)
     if channel:
         await channel.send("\U0001F525 포켓몬 RPG 메뉴", view=MenuView(user=None))
+
+async def start_battle(interaction):
+    uid = str(interaction.user.id)
+    if uid not in user_profiles or user_profiles[uid]["main"] is None:
+        await interaction.response.send_message("대표 포켓몬이 없습니다.")
+        return
+
+    player_mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
+    wild_name = random.choice(["야돈", "깨비참", "리자드", "푸호꼬"])
+    wild_level = random.randint(player_mon["level"] - 1, player_mon["level"] + 2)
+    wild_iv = generate_iv()
+    wild_mon = {
+        "name": wild_name,
+        "level": wild_level,
+        "iv": wild_iv,
+        "max_hp": calculate_stat(wild_iv["HP"], wild_level),
+        "hp": calculate_stat(wild_iv["HP"], wild_level)
+    }
+    await interaction.response.send_message(f"야생의 {wild_name}(Lv{wild_level})이 나타났다!", view=BattleView(interaction.user, player_mon, wild_mon))
+
+class BattleView(discord.ui.View):
+    def __init__(self, user, player_mon, wild_mon):
+        super().__init__(timeout=60)
+        self.user = user
+        self.player = player_mon
+        self.enemy = wild_mon
+        self.special_used = False
+
+    async def end_battle(self, interaction, result):
+        await interaction.response.send_message(f"배틀 종료! 결과: {result}")
+        self.stop()
+
+    def calculate_damage(self, base):
+        return random.randint(base - 2, base + 2)
+
+    @discord.ui.button(label="🥊 기본기", style=discord.ButtonStyle.primary, row=0)
+    async def basic_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
+        damage = self.calculate_damage(10)
+        self.enemy["hp"] -= damage
+        msg = f"기본기로 {self.enemy['name']}에게 {damage} 데미지를 입혔다!\n"
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction, "승리")
+            return
+        msg += f"{self.enemy['name']} 남은 체력: {self.enemy['hp']}/{self.enemy['max_hp']}"
+        await interaction.response.send_message(msg)
+
+    @discord.ui.button(label="🔥 특수기", style=discord.ButtonStyle.danger, row=0)
+    async def special_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if random.random() < 0.7:
+            damage = self.calculate_damage(20)
+            self.enemy["hp"] -= damage
+            msg = f"특수기로 {self.enemy['name']}에게 {damage} 데미지를 입혔다!\n"
+        else:
+            msg = "특수기가 빗나갔다!\n"
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction, "승리")
+            return
+        msg += f"{self.enemy['name']} 남은 체력: {self.enemy['hp']}/{self.enemy['max_hp']}"
+        await interaction.response.send_message(msg)
+
+    @discord.ui.button(label="🌀 유틸기", style=discord.ButtonStyle.secondary, row=1)
+    async def utility(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.enemy["iv"]["SPD"] = max(1, self.enemy["iv"]["SPD"] - 2)
+        await interaction.response.send_message(f"{self.enemy['name']}의 스피드가 감소했다!")
+
+    @discord.ui.button(label="💥 필살기", style=discord.ButtonStyle.success, row=1)
+    async def ultimate(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.special_used:
+            await interaction.response.send_message("이미 필살기를 사용했습니다!")
+            return
+        damage = int((1 - (self.player["hp"] / self.player["max_hp"])) * 40) + 10
+        self.enemy["hp"] -= damage
+        self.special_used = True
+        msg = f"필살기로 {self.enemy['name']}에게 {damage} 데미지를 입혔다!\n"
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction, "승리")
+            return
+        msg += f"{self.enemy['name']} 남은 체력: {self.enemy['hp']}/{self.enemy['max_hp']}"
+        await interaction.response.send_message(msg)
 
 bot.run(os.getenv("DISCORD_TOKEN"))
