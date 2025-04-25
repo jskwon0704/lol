@@ -136,6 +136,10 @@ async def handle_hunt(interaction, zone):
 
     await interaction.response.send_message(message)
 
+@bot.command()
+async def 메뉴(ctx):
+    await ctx.send("\U0001F525 포켓몬 RPG 메뉴", view=MenuView(user=ctx.author))
+
 @bot.event
 async def on_ready():
     print(f"{bot.user} 접속 완료!")
