@@ -37,7 +37,7 @@ class MenuView(discord.ui.View):
         super().__init__(timeout=None)
         self.user = user
 
-    @discord.ui.button(label="대표 포켓몬 설정", style=discord.ButtonStyle.primary)
+   @discord.ui.button(label="대표 포켓몬 설정", style=discord.ButtonStyle.primary)
     async def 대표설정(self, interaction: discord.Interaction, button: discord.ui.Button):
         roles = [role.name for role in interaction.user.roles]
         uid = str(interaction.user.id)
@@ -59,7 +59,23 @@ class MenuView(discord.ui.View):
                 "hp": calculate_stat(iv["HP"], 1)
             }
         user_profiles[uid]["main"] = name
-        await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.", ephemeral=False)
+        await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.", ephemeral=True)
+
+    @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
+    async def 사냥(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.delete()
+        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=True)
+
+    @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
+    async def 프로필(self, interaction: discord.Interaction, button: discord.ui.Button):
+        uid = str(interaction.user.id)
+        if uid not in user_profiles or user_profiles[uid]["main"] is None:
+            await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
+            return
+        mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
+        msg = f"{interaction.user.mention}의 프로필\n대표 포켓몬: {user_profiles[uid]['main']}\n"
+        msg += f"레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
+        await interaction.response.send_message(msg, ephemeral=True)
 
     @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
     async def 사냥(self, interaction: discord.Interaction, button: discord.ui.Button):
