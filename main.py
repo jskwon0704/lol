@@ -85,22 +85,27 @@ class HuntingView(discord.ui.View):
 
     @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary, row=0)
     async def hunt1(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.edit(view=None)
         await start_battle(interaction, 1)
 
     @discord.ui.button(label="사냥터 2", style=discord.ButtonStyle.primary, row=0)
     async def hunt2(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.edit(view=None)
         await start_battle(interaction, 2)
 
     @discord.ui.button(label="사냥터 3", style=discord.ButtonStyle.primary, row=1)
     async def hunt3(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.edit(view=None)
         await start_battle(interaction, 3)
 
     @discord.ui.button(label="사냥터 4", style=discord.ButtonStyle.primary, row=1)
     async def hunt4(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.edit(view=None)
         await start_battle(interaction, 4)
 
     @discord.ui.button(label="사냥터 5", style=discord.ButtonStyle.primary, row=2)
     async def hunt5(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.message.edit(view=None)
         await start_battle(interaction, 5)
 class BattleView(discord.ui.View):
     def __init__(self, user, player_mon, wild_mon):
