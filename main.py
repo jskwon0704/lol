@@ -107,22 +107,59 @@ class HuntingView(discord.ui.View):
     async def hunt5(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.message.edit(view=None)
         await start_battle(interaction, 5)
+def exp_to_next_level(level):
+    return int(50 + (level * 10) + (1.5 * (level ** 2)))
+
+def calculate_stat(iv, level):
+    return int((iv * level / 10) + level)
+
+def generate_iv():
+    return {stat: random.randint(10, 31) for stat in ["HP", "ATK", "DEF", "SPD"]}
+
+def get_pokemon_image(name):
+    images = {
+        "파이리": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png",
+        "야돈": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/79.png"
+    }
+    return images.get(name, "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png")
+
+class MenuView(discord.ui.View):
+    def __init__(self, user):
+        super().__init__(timeout=None)
+        self.user = user
+
 class BattleView(discord.ui.View):
     def __init__(self, user, player_mon, wild_mon):
-        super().__init__(timeout=60)
+        super().__init__(timeout=120)
         self.user = user
         self.player = player_mon
         self.enemy = wild_mon
         self.special_used = False
-        self.message = None  # 전투 메시지 저장용
+        self.message = None
+        self.logs = []
 
     def build_status_embed(self, turn_owner, action_text=""):
-        embed = discord.Embed(title=f"턴: {turn_owner}", color=discord.Color.blue())
-        embed.add_field(name="플레이어", value=f"Lv{self.player['level']}\nHP: {self.player['hp']} / {self.player['max_hp']}", inline=True)
-        embed.add_field(name="상대", value=f"Lv{self.enemy['level']}\nHP: {self.enemy['hp']} / {self.enemy['max_hp']}", inline=True)
+        embed = discord.Embed(title=f"{self.user.display_name}의 전투", color=discord.Color.green())
+        embed.add_field(name="플레이어", value=f"Lv{self.player['level']} | HP: {self.player['hp']} / {self.player['max_hp']}", inline=True)
+        embed.add_field(name="상대", value=f"Lv{self.enemy['level']} | HP: {self.enemy['hp']} / {self.enemy['max_hp']}", inline=True)
+        embed.add_field(name="현재 턴", value=turn_owner, inline=False)
+
         if action_text:
-            embed.add_field(name="전투 로그", value=action_text, inline=False)
+            self.logs.append(action_text)
+        if len(self.logs) > 3:
+            self.logs = self.logs[-3:]
+        if self.logs:
+            embed.add_field(name="전투 로그", value="\n".join(self.logs), inline=False)
+
+        player_img = get_pokemon_image(self.user_profiles_main())
+        enemy_img = get_pokemon_image(self.enemy["name"])
+        embed.set_thumbnail(url=player_img)
+        embed.set_image(url=enemy_img)
         return embed
+
+    def user_profiles_main(self):
+        uid = str(self.user.id)
+        return user_profiles[uid]["main"] if uid in user_profiles else "파이리"
 
     async def update_message(self, interaction, action_text):
         embed = self.build_status_embed("플레이어", action_text)
@@ -138,39 +175,37 @@ class BattleView(discord.ui.View):
         uid = str(interaction.user.id)
         gained_exp = random.randint(30, 60)
         self.player["exp"] += gained_exp
-        level_up_msgs = []
+        logs = [f"전투 종료!", f"경험치 +{gained_exp}"]
         while self.player["exp"] >= self.player["next_exp"]:
             self.player["exp"] -= self.player["next_exp"]
             self.player["level"] += 1
             self.player["next_exp"] = exp_to_next_level(self.player["level"])
             self.player["max_hp"] = calculate_stat(self.player["iv"]["HP"], self.player["level"])
             self.player["hp"] = self.player["max_hp"]
-            level_up_msgs.append(f"레벨업! 현재 레벨: {self.player['level']}")
-
-        summary = f"전투 종료! 승리\n획득 경험치: {gained_exp}\n" + "\n".join(level_up_msgs)
-        embed = discord.Embed(title="전투 종료", description=summary)
+            logs.append(f"레벨업! → Lv{self.player['level']}")
+        embed = discord.Embed(title="전투 종료", description="\n".join(logs), color=discord.Color.gold())
         await self.message.edit(embed=embed, view=None)
-        await asyncio.sleep(1.5)
-        await self.message.edit(content="다음 행동을 선택하세요:", embed=None, view=MenuView(user=self.user))
+        await asyncio.sleep(2)
+        await self.message.edit(content="메뉴로 돌아갑니다.", embed=None, view=MenuView(user=self.user))
         self.stop()
 
     @discord.ui.button(label="기본기", style=discord.ButtonStyle.primary)
     async def basic_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
-        damage = self.calculate_damage(10)
-        self.enemy["hp"] -= damage
+        dmg = self.calculate_damage(10)
+        self.enemy["hp"] -= dmg
         if self.enemy["hp"] <= 0:
             await self.end_battle(interaction)
             return
-        await self.update_message(interaction, f"기본기로 {damage} 데미지!")
+        await self.update_message(interaction, f"기본기 → {dmg} 데미지")
 
     @discord.ui.button(label="특수기", style=discord.ButtonStyle.danger)
     async def special_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
         if random.random() < 0.7:
-            damage = self.calculate_damage(20)
-            self.enemy["hp"] -= damage
-            result = f"특수기로 {damage} 데미지!"
+            dmg = self.calculate_damage(20)
+            self.enemy["hp"] -= dmg
+            result = f"특수기 → {dmg} 데미지"
         else:
-            result = "특수기가 빗나갔습니다."
+            result = "특수기가 빗나감"
         if self.enemy["hp"] <= 0:
             await self.end_battle(interaction)
             return
@@ -179,32 +214,32 @@ class BattleView(discord.ui.View):
     @discord.ui.button(label="유틸기", style=discord.ButtonStyle.secondary)
     async def utility(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.enemy["iv"]["SPD"] = max(1, self.enemy["iv"]["SPD"] - 2)
-        await self.update_message(interaction, f"상대의 스피드가 감소했습니다.")
+        await self.update_message(interaction, "상대 SPD 감소")
 
     @discord.ui.button(label="필살기", style=discord.ButtonStyle.success)
     async def ultimate(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.special_used:
-            await interaction.response.send_message("이미 필살기를 사용했습니다!", ephemeral=True)
+            await interaction.response.send_message("필살기는 한 번만 사용 가능합니다!", ephemeral=True)
             return
-        damage = int((1 - (self.player["hp"] / self.player["max_hp"])) * 40) + 10
-        self.enemy["hp"] -= damage
+        dmg = int((1 - (self.player["hp"] / self.player["max_hp"])) * 40) + 10
+        self.enemy["hp"] -= dmg
         self.special_used = True
         if self.enemy["hp"] <= 0:
             await self.end_battle(interaction)
             return
-        await self.update_message(interaction, f"필살기로 {damage} 데미지!")
+        await self.update_message(interaction, f"필살기 → {dmg} 데미지")
 
 async def start_battle(interaction, zone):
     uid = str(interaction.user.id)
     if uid not in user_profiles or user_profiles[uid]["main"] is None:
         await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
         return
-
-    zones = load_hunting_data()
+    zones = {
+        "1": ["야돈"], "2": ["야돈"], "3": ["야돈"], "4": ["야돈"], "5": ["야돈"]
+    }
     if str(zone) not in zones:
         await interaction.response.send_message("존재하지 않는 사냥터입니다.", ephemeral=True)
         return
-
     wild_name = random.choice(zones[str(zone)])
     player_mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
     wild_level = random.randint(player_mon["level"] - 1, player_mon["level"] + 2)
@@ -217,7 +252,7 @@ async def start_battle(interaction, zone):
         "hp": calculate_stat(wild_iv["HP"], wild_level)
     }
     view = BattleView(interaction.user, player_mon, wild_mon)
-    embed = view.build_status_embed("플레이어", f"야생의 {wild_name}(Lv{wild_level})이 나타났다!")
+    embed = view.build_status_embed("플레이어", f"{wild_name}(Lv{wild_level})이 나타났다!")
     view.message = await interaction.response.send_message(embed=embed, view=view, wait=True)
 
 # MenuView
