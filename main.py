@@ -1,8 +1,8 @@
 
 import discord
 from discord.ext import commands
-import os
 import random
+import os
 import asyncio
 
 intents = discord.Intents.default()
@@ -30,20 +30,24 @@ def get_pokemon_image(name):
     }
     return images.get(name, "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png")
 
-class MenuView(discord.ui.View):
-    def __init__(self, user):
+class GameView(discord.ui.View):
+    def __init__(self, user, message):
         super().__init__(timeout=None)
         self.user = user
+        self.message = message
 
     @discord.ui.button(label="대표 포켓몬 설정", style=discord.ButtonStyle.primary)
-    async def set_main(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def 대표설정(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("본인만 조작할 수 있습니다.", ephemeral=True)
+            return
         roles = [role.name for role in interaction.user.roles]
         uid = str(interaction.user.id)
         if uid not in user_profiles:
             user_profiles[uid] = {"owned": {}, "main": None}
         valid = [r for r in roles if r != "@everyone"]
         if not valid:
-            await interaction.response.send_message("보유한 포켓몬 역할이 없습니다.", ephemeral=False)
+            await interaction.response.send_message("보유한 포켓몬 역할이 없습니다.", ephemeral=True)
             return
         name = valid[0]
         if name not in user_profiles[uid]["owned"]:
@@ -57,134 +61,116 @@ class MenuView(discord.ui.View):
                 "hp": calculate_stat(iv["HP"], 1)
             }
         user_profiles[uid]["main"] = name
-        await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.", ephemeral=False)
+        await interaction.response.edit_message(content=f"대표 포켓몬을 **{name}**(으)로 설정했습니다.", view=self)
 
     @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
-    async def hunt(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 메시지 삭제 제거됨
-        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=False)
+    async def 사냥(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("본인만 조작할 수 있습니다.", ephemeral=True)
+            return
+        await interaction.response.edit_message(content="사냥터를 선택하세요.", view=HuntingView(self.user, self.message))
 
     @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
-    async def show_profile(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def 프로필(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("본인만 조작할 수 있습니다.", ephemeral=True)
+            return
         uid = str(interaction.user.id)
         if uid not in user_profiles or user_profiles[uid]["main"] is None:
-            await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=False)
+            await interaction.response.edit_message(content="대표 포켓몬이 없습니다.", view=self)
             return
         mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
-        msg = f"{interaction.user.mention}의 프로필\n대표 포켓몬: {user_profiles[uid]['main']}\n"
-        msg += f"레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
-        await interaction.response.send_message(msg, ephemeral=False)
+        msg = f"📘 프로필\n대표: {user_profiles[uid]['main']}\nLv: {mon['level']} | EXP: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
+        await interaction.response.edit_message(content=msg, view=self)
 
 class HuntingView(discord.ui.View):
-    def __init__(self, user):
-        super().__init__(timeout=300)
+    def __init__(self, user, message):
+        super().__init__(timeout=None)
         self.user = user
+        self.message = message
 
     @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary)
     async def zone1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 메시지 삭제 제거됨
-        await start_battle(interaction, 1)
+        if interaction.user != self.user:
+            await interaction.response.send_message("본인만 조작할 수 있습니다.", ephemeral=True)
+            return
+        await start_battle(interaction, self.message)
 
 class BattleView(discord.ui.View):
-    def __init__(self, user, player_mon, wild_mon):
-        super().__init__(timeout=120)
+    def __init__(self, user, player, enemy, message):
+        super().__init__(timeout=None)
         self.user = user
-        self.player = player_mon
-        self.enemy = wild_mon
-        self.special_used = False
-        self.message = None
+        self.player = player
+        self.enemy = enemy
+        self.message = message
         self.logs = []
+        self.special_used = False
 
-    def build_status_embed(self, turn_owner, action_text=""):
-        embed = discord.Embed(title=f"{self.user.display_name}의 전투", color=discord.Color.green())
-        embed.add_field(name="플레이어", value=f"Lv{self.player['level']} | HP: {self.player['hp']} / {self.player['max_hp']}", inline=True)
-        embed.add_field(name="상대", value=f"Lv{self.enemy['level']} | HP: {self.enemy['hp']} / {self.enemy['max_hp']}", inline=True)
-        embed.add_field(name="현재 턴", value=turn_owner, inline=False)
-
-        if action_text:
-            self.logs.append(action_text)
+    def build_embed(self, action=""):
+        embed = discord.Embed(title=f"{self.user.display_name}의 전투", color=discord.Color.orange())
+        embed.add_field(name="플레이어", value=f"Lv{self.player['level']} | HP: {self.player['hp']}/{self.player['max_hp']}", inline=True)
+        embed.add_field(name="적", value=f"Lv{self.enemy['level']} | HP: {self.enemy['hp']}/{self.enemy['max_hp']}", inline=True)
+        if action:
+            self.logs.append(action)
         if len(self.logs) > 3:
             self.logs = self.logs[-3:]
-        if self.logs:
-            embed.add_field(name="전투 로그", value="\n".join(self.logs), inline=False)
-
-        player_img = get_pokemon_image(self.user_profiles_main())
-        enemy_img = get_pokemon_image(self.enemy["name"])
-        embed.set_thumbnail(url=player_img)
-        embed.set_image(url=enemy_img)
+        embed.add_field(name="전투 로그", value="\n".join(self.logs) or "없음", inline=False)
+        embed.set_thumbnail(url=get_pokemon_image(self.user_profiles_main()))
+        embed.set_image(url=get_pokemon_image(self.enemy["name"]))
         return embed
 
     def user_profiles_main(self):
         uid = str(self.user.id)
         return user_profiles[uid]["main"] if uid in user_profiles else "파이리"
 
-    async def update_message(self, interaction, action_text):
-        embed = self.build_status_embed("플레이어", action_text)
-        if self.message:
-            await self.message.edit(embed=embed, view=self)
-        else:
-            self.message = await interaction.response.send_message(embed=embed, view=self, wait=True)
-
-    def calculate_damage(self, base):
-        return random.randint(base - 2, base + 2)
+    def damage(self, base): return random.randint(base - 2, base + 2)
 
     async def end_battle(self, interaction):
-        uid = str(interaction.user.id)
-        gained_exp = random.randint(30, 60)
-        self.player["exp"] += gained_exp
-        logs = [f"전투 종료!", f"경험치 +{gained_exp}"]
+        self.logs.append("전투 종료!")
+        gained = random.randint(20, 50)
+        self.player["exp"] += gained
         while self.player["exp"] >= self.player["next_exp"]:
             self.player["exp"] -= self.player["next_exp"]
             self.player["level"] += 1
             self.player["next_exp"] = exp_to_next_level(self.player["level"])
             self.player["max_hp"] = calculate_stat(self.player["iv"]["HP"], self.player["level"])
             self.player["hp"] = self.player["max_hp"]
-            logs.append(f"레벨업! → Lv{self.player['level']}")
-        embed = discord.Embed(title="전투 종료", description="\n".join(logs), color=discord.Color.gold())
-        await self.message.edit(embed=embed, view=None)
-        await asyncio.sleep(2)
-        await self.message.edit(content="메뉴로 돌아갑니다.", embed=None, view=MenuView(user=self.user))
-        self.stop()
+            self.logs.append(f"레벨업! → Lv{self.player['level']}")
+        await self.message.edit(content="전투 종료", embed=self.build_embed("EXP +" + str(gained)), view=GameView(self.user, self.message))
 
     @discord.ui.button(label="기본기", style=discord.ButtonStyle.primary)
-    async def basic_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
-        dmg = self.calculate_damage(10)
+    async def basic(self, interaction: discord.Interaction, button: discord.ui.Button):
+        dmg = self.damage(10)
         self.enemy["hp"] -= dmg
         if self.enemy["hp"] <= 0:
             await self.end_battle(interaction)
             return
-        await self.update_message(interaction, f"기본기 → {dmg} 데미지")
+        await self.message.edit(embed=self.build_embed(f"기본기 → {dmg} 데미지"), view=self)
 
-async def start_battle(interaction, zone):
+async def start_battle(interaction, message):
     uid = str(interaction.user.id)
     if uid not in user_profiles or user_profiles[uid]["main"] is None:
-        await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=False)
+        await interaction.response.edit_message(content="대표 포켓몬이 없습니다.")
         return
-    zones = {"1": ["야돈"]}
-    if str(zone) not in zones:
-        await interaction.response.send_message("존재하지 않는 사냥터입니다.", ephemeral=False)
-        return
-    wild_name = random.choice(zones[str(zone)])
-    player_mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
-    wild_level = random.randint(player_mon["level"] - 1, player_mon["level"] + 2)
-    wild_iv = generate_iv()
-    wild_mon = {
-        "name": wild_name,
-        "level": wild_level,
-        "iv": wild_iv,
-        "max_hp": calculate_stat(wild_iv["HP"], wild_level),
-        "hp": calculate_stat(wild_iv["HP"], wild_level)
+    player = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
+    wild = {
+        "name": "야돈",
+        "level": random.randint(player["level"], player["level"] + 2),
+        "iv": generate_iv()
     }
-    view = BattleView(interaction.user, player_mon, wild_mon)
-    embed = view.build_status_embed("플레이어", f"{wild_name}(Lv{wild_level})이 나타났다!")
-    view.message = await interaction.followup.send(embed=embed, view=view)
+    wild["max_hp"] = calculate_stat(wild["iv"]["HP"], wild["level"])
+    wild["hp"] = wild["max_hp"]
+    embed = discord.Embed(title="야생 포켓몬 등장!", description="전투를 시작합니다.", color=discord.Color.red())
+    view = BattleView(interaction.user, player, wild, message)
+    await interaction.response.edit_message(embed=view.build_embed("전투 시작!"), view=view)
 
 @bot.command()
 async def 메뉴(ctx):
-    await ctx.send("포켓몬 RPG 메뉴", view=MenuView(user=ctx.author))
+    msg = await ctx.send("포켓몬 RPG 메뉴 로딩 중...")
+    await msg.edit(content="메뉴를 선택하세요.", view=GameView(ctx.author, msg))
 
 @bot.event
 async def on_ready():
-    print(f"{bot.user} 접속 완료!")
+    print(f"{bot.user} 준비 완료!")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
