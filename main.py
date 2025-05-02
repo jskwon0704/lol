@@ -18,6 +18,8 @@ def generate_iv():
     return {stat: random.randint(10, 31) for stat in ["HP", "ATK", "DEF", "SPD"]}
 
 def calculate_stat(iv, level):
+    base = 40 if iv == 'HP' else 0
+    return int((iv * level / 10) + level + base)
     return int((iv * level / 10) + level)
 
 def exp_to_next_level(level):
@@ -166,6 +168,38 @@ class BattleView(discord.ui.View):
             await self.end_battle(interaction)
             return
         await self.message.edit(embed=self.build_embed(f"필살기 → {dmg} 데미지"), view=self)
+
+        dmg = self.damage(10)
+        self.enemy["hp"] -= dmg
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction)
+            return
+        await self.message.edit(embed=self.build_embed(f"기본기 → {dmg} 데미지"), view=self)
+
+        if random.random() < 0.7:
+            dmg = self.damage(20)
+            self.enemy["hp"] -= dmg
+            result = f"특수기 → {dmg} 데미지"
+        else:
+            result = "특수기 빗나감"
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction)
+            return
+        await self.message.edit(embed=self.build_embed(result), view=self)
+
+        self.enemy["iv"]["SPD"] = max(1, self.enemy["iv"]["SPD"] - 3)
+        await self.message.edit(embed=self.build_embed("상대 SPD 감소"), view=self)
+
+        if self.special_used:
+            await interaction.response.send_message("필살기는 1회만 사용할 수 있습니다!", ephemeral=True)
+            return
+        dmg = int((1 - (self.player["hp"] / self.player["max_hp"])) * 40) + 15
+        self.enemy["hp"] -= dmg
+        self.special_used = True
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction)
+            return
+        await self.message.edit(embed=self.build_embed(f"필살기 → {dmg} 데미지"), view=self)
         self.logs.append("전투 종료!")
         gained = random.randint(20, 50)
         self.player["exp"] += gained
@@ -178,8 +212,6 @@ class BattleView(discord.ui.View):
             self.logs.append(f"레벨업! → Lv{self.player['level']}")
         await self.message.edit(content="전투 종료", embed=self.build_embed("EXP +" + str(gained)), view=GameView(self.user, self.message))
 
-    @discord.ui.button(label="기본기", style=discord.ButtonStyle.primary)
-    async def basic(self, interaction: discord.Interaction, button: discord.ui.Button):
         dmg = self.damage(10)
         self.enemy["hp"] -= dmg
         if self.enemy["hp"] <= 0:
