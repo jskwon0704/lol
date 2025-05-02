@@ -62,7 +62,7 @@ class MenuView(discord.ui.View):
     @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
     async def hunt(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.message.delete()
-        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=True)
+        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=False)
 
     @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
     async def show_profile(self, interaction: discord.Interaction, button: discord.ui.Button):
