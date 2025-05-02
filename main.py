@@ -1,9 +1,8 @@
 
 import discord
 from discord.ext import commands
-import json
-import random
 import os
+import random
 import asyncio
 
 intents = discord.Intents.default()
@@ -14,7 +13,6 @@ intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 user_profiles = {}
-TARGET_CHANNEL_ID = 123456789012345678  # 실제 채널 ID로 교체 필요
 
 def generate_iv():
     return {stat: random.randint(10, 31) for stat in ["HP", "ATK", "DEF", "SPD"]}
@@ -37,8 +35,8 @@ class MenuView(discord.ui.View):
         super().__init__(timeout=None)
         self.user = user
 
-   @discord.ui.button(label="대표 포켓몬 설정", style=discord.ButtonStyle.primary)
-    async def 대표설정(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="대표 포켓몬 설정", style=discord.ButtonStyle.primary)
+    async def set_main(self, interaction: discord.Interaction, button: discord.ui.Button):
         roles = [role.name for role in interaction.user.roles]
         uid = str(interaction.user.id)
         if uid not in user_profiles:
@@ -62,12 +60,12 @@ class MenuView(discord.ui.View):
         await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.", ephemeral=True)
 
     @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
-    async def 사냥(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def hunt(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.message.delete()
         await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=True)
 
     @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
-    async def 프로필(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def show_profile(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = str(interaction.user.id)
         if uid not in user_profiles or user_profiles[uid]["main"] is None:
             await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
@@ -77,29 +75,13 @@ class MenuView(discord.ui.View):
         msg += f"레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
         await interaction.response.send_message(msg, ephemeral=True)
 
-    @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
-    async def 사냥(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.delete()
-        await interaction.followup.send("사냥터를 선택하세요.", view=HuntingView(interaction.user))
-
-    @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
-    async def 프로필(self, interaction: discord.Interaction, button: discord.ui.Button):
-        uid = str(interaction.user.id)
-        if uid not in user_profiles or user_profiles[uid]["main"] is None:
-            await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
-            return
-        mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
-        msg = f"{interaction.user.mention}의 프로필\n대표 포켓몬: {user_profiles[uid]['main']}\n"
-        msg += f"레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
-        await interaction.response.send_message(msg, ephemeral=False)
-
 class HuntingView(discord.ui.View):
     def __init__(self, user):
         super().__init__(timeout=60)
         self.user = user
 
     @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary)
-    async def hunt1(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def zone1(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.message.delete()
         await start_battle(interaction, 1)
 
@@ -204,8 +186,5 @@ async def 메뉴(ctx):
 @bot.event
 async def on_ready():
     print(f"{bot.user} 접속 완료!")
-    channel = bot.get_channel(TARGET_CHANNEL_ID)
-    if channel:
-        await channel.send("포켓몬 RPG 메뉴", view=MenuView(user=None))
 
 bot.run(os.getenv("DISCORD_TOKEN"))
