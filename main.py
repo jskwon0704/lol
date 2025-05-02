@@ -126,6 +126,46 @@ class BattleView(discord.ui.View):
     def damage(self, base): return random.randint(base - 2, base + 2)
 
     async def end_battle(self, interaction):
+
+    @discord.ui.button(label="기본기", style=discord.ButtonStyle.primary, row=0)
+    async def basic(self, interaction: discord.Interaction, button: discord.ui.Button):
+        dmg = self.damage(10)
+        self.enemy["hp"] -= dmg
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction)
+            return
+        await self.message.edit(embed=self.build_embed(f"기본기 → {dmg} 데미지"), view=self)
+
+    @discord.ui.button(label="특수기", style=discord.ButtonStyle.danger, row=0)
+    async def special(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if random.random() < 0.7:
+            dmg = self.damage(20)
+            self.enemy["hp"] -= dmg
+            result = f"특수기 → {dmg} 데미지"
+        else:
+            result = "특수기 빗나감"
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction)
+            return
+        await self.message.edit(embed=self.build_embed(result), view=self)
+
+    @discord.ui.button(label="유틸기", style=discord.ButtonStyle.secondary, row=1)
+    async def utility(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.enemy["iv"]["SPD"] = max(1, self.enemy["iv"]["SPD"] - 3)
+        await self.message.edit(embed=self.build_embed("상대 SPD 감소"), view=self)
+
+    @discord.ui.button(label="필살기", style=discord.ButtonStyle.success, row=1)
+    async def ultimate(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.special_used:
+            await interaction.response.send_message("필살기는 1회만 사용할 수 있습니다!", ephemeral=True)
+            return
+        dmg = int((1 - (self.player["hp"] / self.player["max_hp"])) * 40) + 15
+        self.enemy["hp"] -= dmg
+        self.special_used = True
+        if self.enemy["hp"] <= 0:
+            await self.end_battle(interaction)
+            return
+        await self.message.edit(embed=self.build_embed(f"필살기 → {dmg} 데미지"), view=self)
         self.logs.append("전투 종료!")
         gained = random.randint(20, 50)
         self.player["exp"] += gained
