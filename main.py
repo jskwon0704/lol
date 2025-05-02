@@ -62,7 +62,7 @@ class MenuView(discord.ui.View):
     @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
     async def hunt(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.message.delete()
-        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=False)
+        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=True)
 
     @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
     async def show_profile(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -177,7 +177,7 @@ async def start_battle(interaction, zone):
     }
     view = BattleView(interaction.user, player_mon, wild_mon)
     embed = view.build_status_embed("플레이어", f"{wild_name}(Lv{wild_level})이 나타났다!")
-    view.message = await interaction.response.send_message(embed=embed, view=view, wait=True)
+    view.message = await interaction.followup.send(embed=embed, view=view)
 
 @bot.command()
 async def 메뉴(ctx):
