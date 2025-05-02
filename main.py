@@ -115,15 +115,15 @@ class BattleView(discord.ui.View):
         self.enemy = wild_mon
         self.special_used = False
 
-    def build_status(self, turn_owner):
-        msg = f"턴: {turn_owner}\n"
-        msg += f"플레이어 Lv{self.player['level']} HP: {self.player['hp']}/{self.player['max_hp']}\n"
-        msg += f"상대 Lv{self.enemy['level']} HP: {self.enemy['hp']}/{self.enemy['max_hp']}\n\n"
-        return msg
+    def build_status_embed(self, turn_owner):
+        embed = discord.Embed(title=f"현재 턴: {turn_owner}", color=discord.Color.blue())
+        embed.add_field(name="플레이어", value=f"레벨: {self.player['level']}\nHP: {self.player['hp']} / {self.player['max_hp']}", inline=False)
+        embed.add_field(name="상대", value=f"레벨: {self.enemy['level']}\nHP: {self.enemy['hp']} / {self.enemy['max_hp']}", inline=False)
+        return embed
 
-    async def update_message(self, interaction, action_text):
-        status = self.build_status("플레이어")
-        await interaction.message.edit(content=status + action_text, view=self)
+    async def update_gui(self, interaction, action_text):
+        embed = self.build_status_embed("플레이어")
+        await interaction.message.edit(embed=embed, content=action_text, view=self)
 
     def calculate_damage(self, base):
         return random.randint(base - 2, base + 2)
@@ -141,9 +141,9 @@ class BattleView(discord.ui.View):
             self.player["hp"] = self.player["max_hp"]
             level_up_msgs.append(f"레벨업! 현재 레벨: {self.player['level']}")
 
-        summary = f"전투 종료! 승리\n경험치 +{gained_exp}\n" + "\n".join(level_up_msgs)
+        summary = f"전투 종료! 승리\n획득 경험치: {gained_exp}\n" + "\n".join(level_up_msgs)
         await asyncio.sleep(1)
-        await interaction.message.edit(content=summary, view=None)
+        await interaction.message.edit(content=summary, embed=None, view=None)
         await interaction.followup.send("다음 행동을 선택하세요:", view=MenuView(user=interaction.user))
         self.stop()
 
@@ -156,7 +156,7 @@ class BattleView(discord.ui.View):
         if self.enemy["hp"] <= 0:
             await self.end_battle(interaction)
             return
-        await interaction.followup.send(self.build_status("플레이어") + f"기본기로 상대에게 {damage} 데미지!", view=self)
+        await self.update_gui(interaction, f"기본기로 {damage} 데미지!")
 
     @discord.ui.button(label="특수기", style=discord.ButtonStyle.danger, row=0)
     async def special_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -165,20 +165,20 @@ class BattleView(discord.ui.View):
         if random.random() < 0.7:
             damage = self.calculate_damage(20)
             self.enemy["hp"] -= damage
-            result = f"특수기로 상대에게 {damage} 데미지!"
+            result = f"특수기로 {damage} 데미지!"
         else:
-            result = "특수기가 빗나갔다!"
+            result = "특수기가 빗나갔습니다."
         if self.enemy["hp"] <= 0:
             await self.end_battle(interaction)
             return
-        await interaction.followup.send(self.build_status("플레이어") + result, view=self)
+        await self.update_gui(interaction, result)
 
     @discord.ui.button(label="유틸기", style=discord.ButtonStyle.secondary, row=1)
     async def utility(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.message.edit(content="유틸기 사용 중...", view=None)
         await asyncio.sleep(1)
         self.enemy["iv"]["SPD"] = max(1, self.enemy["iv"]["SPD"] - 2)
-        await interaction.followup.send(self.build_status("플레이어") + f"상대의 스피드가 감소했다!", view=self)
+        await self.update_gui(interaction, f"상대의 스피드가 감소했습니다.")
 
     @discord.ui.button(label="필살기", style=discord.ButtonStyle.success, row=1)
     async def ultimate(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -193,9 +193,8 @@ class BattleView(discord.ui.View):
         if self.enemy["hp"] <= 0:
             await self.end_battle(interaction)
             return
-        await interaction.followup.send(self.build_status("플레이어") + f"필살기로 상대에게 {damage} 데미지!", view=self)
+        await self.update_gui(interaction, f"필살기로 {damage} 데미지!")
 
-# start_battle 내부 메시지 문구도 수정
 async def start_battle(interaction, zone):
     uid = str(interaction.user.id)
     if uid not in user_profiles or user_profiles[uid]["main"] is None:
@@ -218,10 +217,9 @@ async def start_battle(interaction, zone):
         "max_hp": calculate_stat(wild_iv["HP"], wild_level),
         "hp": calculate_stat(wild_iv["HP"], wild_level)
     }
-    status = f"야생의 {wild_name}(Lv{wild_level})이 나타났다!\n"
     view = BattleView(interaction.user, player_mon, wild_mon)
-    status += view.build_status("플레이어")
-    await interaction.response.send_message(status, view=view)
+    embed = view.build_status_embed("플레이어")
+    await interaction.response.send_message("야생의 적이 나타났다!", embed=embed, view=view)
 
 # MenuView 텍스트도 이모지 제거
 @bot.command()
