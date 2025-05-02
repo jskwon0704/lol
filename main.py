@@ -43,7 +43,7 @@ class MenuView(discord.ui.View):
             user_profiles[uid] = {"owned": {}, "main": None}
         valid = [r for r in roles if r != "@everyone"]
         if not valid:
-            await interaction.response.send_message("보유한 포켓몬 역할이 없습니다.", ephemeral=True)
+            await interaction.response.send_message("보유한 포켓몬 역할이 없습니다.", ephemeral=False)
             return
         name = valid[0]
         if name not in user_profiles[uid]["owned"]:
@@ -57,32 +57,32 @@ class MenuView(discord.ui.View):
                 "hp": calculate_stat(iv["HP"], 1)
             }
         user_profiles[uid]["main"] = name
-        await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.", ephemeral=True)
+        await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.", ephemeral=False)
 
     @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
     async def hunt(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.delete()
-        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=True)
+        # 메시지 삭제 제거됨
+        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user), ephemeral=False)
 
     @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
     async def show_profile(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = str(interaction.user.id)
         if uid not in user_profiles or user_profiles[uid]["main"] is None:
-            await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
+            await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=False)
             return
         mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
         msg = f"{interaction.user.mention}의 프로필\n대표 포켓몬: {user_profiles[uid]['main']}\n"
         msg += f"레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
-        await interaction.response.send_message(msg, ephemeral=True)
+        await interaction.response.send_message(msg, ephemeral=False)
 
 class HuntingView(discord.ui.View):
     def __init__(self, user):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.user = user
 
     @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary)
     async def zone1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.delete()
+        # 메시지 삭제 제거됨
         await start_battle(interaction, 1)
 
 class BattleView(discord.ui.View):
@@ -158,11 +158,11 @@ class BattleView(discord.ui.View):
 async def start_battle(interaction, zone):
     uid = str(interaction.user.id)
     if uid not in user_profiles or user_profiles[uid]["main"] is None:
-        await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
+        await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=False)
         return
     zones = {"1": ["야돈"]}
     if str(zone) not in zones:
-        await interaction.response.send_message("존재하지 않는 사냥터입니다.", ephemeral=True)
+        await interaction.response.send_message("존재하지 않는 사냥터입니다.", ephemeral=False)
         return
     wild_name = random.choice(zones[str(zone)])
     player_mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
