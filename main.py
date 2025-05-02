@@ -1,3 +1,4 @@
+
 import discord
 from discord.ext import commands
 import json
@@ -13,7 +14,7 @@ intents.presences = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 user_profiles = {}
-TARGET_CHANNEL_ID = 123456789012345678  # 여기에 봇이 메뉴 버튼을 보내야 할 채널 ID를 입력하세요
+TARGET_CHANNEL_ID = 123456789012345678  # 실제 채널 ID로 교체 필요
 
 def generate_iv():
     return {stat: random.randint(10, 31) for stat in ["HP", "ATK", "DEF", "SPD"]}
@@ -24,16 +25,12 @@ def calculate_stat(iv, level):
 def exp_to_next_level(level):
     return int(50 + (level * 10) + (1.5 * (level ** 2)))
 
-def load_hunting_data():
-    with open("hunting_zones.json", "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def hp_bar(current, max_hp):
-    ratio = current / max_hp
-    total_bars = 10
-    filled = int(ratio * total_bars)
-    empty = total_bars - filled
-    return '🟩' * filled + '🟥' * empty
+def get_pokemon_image(name):
+    images = {
+        "파이리": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png",
+        "야돈": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/79.png"
+    }
+    return images.get(name, "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png")
 
 class MenuView(discord.ui.View):
     def __init__(self, user):
@@ -73,79 +70,22 @@ class MenuView(discord.ui.View):
     async def 프로필(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = str(interaction.user.id)
         if uid not in user_profiles or user_profiles[uid]["main"] is None:
-            await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬이 없습니다.", ephemeral=True)
+            await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
             return
         mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
         msg = f"{interaction.user.mention}의 프로필\n대표 포켓몬: {user_profiles[uid]['main']}\n"
         msg += f"레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
         await interaction.response.send_message(msg, ephemeral=False)
 
-        user_profiles[uid]["main"] = name
-        await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬을 {name}(으)로 설정했습니다.")
-    @discord.ui.button(label="사냥하기", style=discord.ButtonStyle.success)
-    async def 사냥(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("사냥터를 선택하세요.", view=HuntingView(interaction.user))
-
-    @discord.ui.button(label="프로필 보기", style=discord.ButtonStyle.secondary)
-    async def 프로필(self, interaction: discord.Interaction, button: discord.ui.Button):
-        uid = str(interaction.user.id)
-        if uid not in user_profiles or user_profiles[uid]["main"] is None:
-            await interaction.response.send_message(f"{interaction.user.mention}의 대표 포켓몬이 없습니다.")
-            return
-        mon = user_profiles[uid]["owned"][user_profiles[uid]["main"]]
-        msg = f"{interaction.user.mention}의 프로필\n🎒 대표 포켓몬: {user_profiles[uid]['main']}\n"
-        msg += f"📊 레벨: {mon['level']}\n경험치: {mon['exp']}/{mon['next_exp']}\nIV: {mon['iv']}\nHP: {mon['hp']}/{mon['max_hp']}"
-        await interaction.response.send_message(msg)
-
 class HuntingView(discord.ui.View):
     def __init__(self, user):
         super().__init__(timeout=60)
         self.user = user
 
-    @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="사냥터 1", style=discord.ButtonStyle.primary)
     async def hunt1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.edit(view=None)
+        await interaction.message.delete()
         await start_battle(interaction, 1)
-
-    @discord.ui.button(label="사냥터 2", style=discord.ButtonStyle.primary, row=0)
-    async def hunt2(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.edit(view=None)
-        await start_battle(interaction, 2)
-
-    @discord.ui.button(label="사냥터 3", style=discord.ButtonStyle.primary, row=1)
-    async def hunt3(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.edit(view=None)
-        await start_battle(interaction, 3)
-
-    @discord.ui.button(label="사냥터 4", style=discord.ButtonStyle.primary, row=1)
-    async def hunt4(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.edit(view=None)
-        await start_battle(interaction, 4)
-
-    @discord.ui.button(label="사냥터 5", style=discord.ButtonStyle.primary, row=2)
-    async def hunt5(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.message.edit(view=None)
-        await start_battle(interaction, 5)
-def exp_to_next_level(level):
-    return int(50 + (level * 10) + (1.5 * (level ** 2)))
-
-def calculate_stat(iv, level):
-    return int((iv * level / 10) + level)
-
-def generate_iv():
-    return {stat: random.randint(10, 31) for stat in ["HP", "ATK", "DEF", "SPD"]}
-
-def get_pokemon_image(name):
-    images = {
-        "파이리": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png",
-        "야돈": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/79.png"
-    }
-    return images.get(name, "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png")
-
-class MenuView(discord.ui.View):
-    def __init__(self, user):
-        super().__init__(timeout=None)
-        self.user = user
 
 class BattleView(discord.ui.View):
     def __init__(self, user, player_mon, wild_mon):
@@ -217,45 +157,12 @@ class BattleView(discord.ui.View):
             return
         await self.update_message(interaction, f"기본기 → {dmg} 데미지")
 
-    @discord.ui.button(label="특수기", style=discord.ButtonStyle.danger)
-    async def special_attack(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if random.random() < 0.7:
-            dmg = self.calculate_damage(20)
-            self.enemy["hp"] -= dmg
-            result = f"특수기 → {dmg} 데미지"
-        else:
-            result = "특수기가 빗나감"
-        if self.enemy["hp"] <= 0:
-            await self.end_battle(interaction)
-            return
-        await self.update_message(interaction, result)
-
-    @discord.ui.button(label="유틸기", style=discord.ButtonStyle.secondary)
-    async def utility(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.enemy["iv"]["SPD"] = max(1, self.enemy["iv"]["SPD"] - 2)
-        await self.update_message(interaction, "상대 SPD 감소")
-
-    @discord.ui.button(label="필살기", style=discord.ButtonStyle.success)
-    async def ultimate(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.special_used:
-            await interaction.response.send_message("필살기는 한 번만 사용 가능합니다!", ephemeral=True)
-            return
-        dmg = int((1 - (self.player["hp"] / self.player["max_hp"])) * 40) + 10
-        self.enemy["hp"] -= dmg
-        self.special_used = True
-        if self.enemy["hp"] <= 0:
-            await self.end_battle(interaction)
-            return
-        await self.update_message(interaction, f"필살기 → {dmg} 데미지")
-
 async def start_battle(interaction, zone):
     uid = str(interaction.user.id)
     if uid not in user_profiles or user_profiles[uid]["main"] is None:
         await interaction.response.send_message("대표 포켓몬이 없습니다.", ephemeral=True)
         return
-    zones = {
-        "1": ["야돈"], "2": ["야돈"], "3": ["야돈"], "4": ["야돈"], "5": ["야돈"]
-    }
+    zones = {"1": ["야돈"]}
     if str(zone) not in zones:
         await interaction.response.send_message("존재하지 않는 사냥터입니다.", ephemeral=True)
         return
@@ -274,7 +181,6 @@ async def start_battle(interaction, zone):
     embed = view.build_status_embed("플레이어", f"{wild_name}(Lv{wild_level})이 나타났다!")
     view.message = await interaction.response.send_message(embed=embed, view=view, wait=True)
 
-# MenuView
 @bot.command()
 async def 메뉴(ctx):
     await ctx.send("포켓몬 RPG 메뉴", view=MenuView(user=ctx.author))
@@ -285,6 +191,5 @@ async def on_ready():
     channel = bot.get_channel(TARGET_CHANNEL_ID)
     if channel:
         await channel.send("포켓몬 RPG 메뉴", view=MenuView(user=None))
-
 
 bot.run(os.getenv("DISCORD_TOKEN"))
